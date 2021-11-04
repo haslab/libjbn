@@ -1,0 +1,356 @@
+/*
+   GENERIC MODULAR CODE
+
+   Assume the existence of the following global constants:
+     glob_p <- modulus "P" (prime number)
+     glob_mp <- "2^(nlimbs*64) - P"
+     glob_pm2 <- "P - 2"
+     glob_oneM <- "R % P = 2^(nlimbs*64) % P"
+     glob_rM <- "R^2 % P = 2^(2*nlimbs*64) % P"
+
+   Name Conventions:
+     _* <- internal (non-exported) jasmin functions
+     *_ <- inlined functions
+     *M <- dealing with Montgomery representation
+*/
+
+#ifndef JASMIN_BN_GENERIC_MODULAR
+#define JASMIN_BN_GENERIC_MODULAR
+
+#ifdef BN_GENERIC_MODULAR_EXPORT
+#define BN_GENERIC_EXPORT
+#endif
+
+#include "bn_generic.jazz"
+
+#define STACK_RETURN_ADDRESS() #[returnaddress="stack"]
+
+/* CONDITIONAL-ADD-P */
+inline fn _bn_caddP_
+( reg bool cf
+, reg ptr u64[nlimbs] x tmp
+) -> reg ptr u64[nlimbs]
+{ inline int i;
+  reg u64 t t0;
+
+  tmp = _bn_copy_(glob_p);
+
+/*
+  _, t -= t - cf;
+  for i = 0 to nlimbs {
+    tmp[i] &= t;
+  }
+*/
+  t0 = 0;
+  for i = 0 to nlimbs {
+    t = tmp[i];
+    t = t0 if !cf;
+    tmp[i] = t;
+  }
+
+  _, x = _bn_addc_( x, tmp );
+
+  return x;
+}
+
+/* x-P if P<=x else x */
+inline fn _bn_cminusP_
+( reg ptr u64[nlimbs] x tmp
+) -> reg ptr u64[nlimbs]
+{ 
+  inline int i;
+  reg bool _cf;
+  reg u64 t;
+
+  tmp = _bn_copy_(x);
+  _cf, tmp = _bn_addc_(tmp, glob_mp);
+
+  x = _bn_cmov_(_cf, x, tmp);
+  return x;
+}
+
+inline fn _bn_addm_
+( reg ptr u64[nlimbs] a b tmp
+) -> reg ptr u64[nlimbs] {
+ _, a = _bn_addc_(a, b);
+ a = _bn_cminusP_(a, tmp);
+ return a;
+}
+
+/* Modular addition */
+fn _bn_addm
+( reg ptr u64[nlimbs] a b
+) -> reg ptr u64[nlimbs] {
+ stack u64[nlimbs] tmp;
+ a = _bn_addm_(a, b, tmp);
+ return a;
+}
+
+inline fn _bn_subm_
+( reg ptr u64[nlimbs] a b tmp
+) -> reg ptr u64[nlimbs] {
+ reg bool cf;
+ cf, a = _bn_subc_(a, b);
+ a = _bn_caddP_(cf, a, tmp);
+ return a;
+}
+
+/* Modular subtraction */
+fn _bn_subm
+( reg ptr u64[nlimbs] a b
+) -> reg ptr u64[nlimbs] {
+ stack u64[nlimbs] tmp;
+ a = _bn_subm_(a, b, tmp);
+ return a;
+}
+
+
+inline fn _bn_rdcn_
+( reg ptr u64[2*nlimbs] a
+, reg ptr u64[nlimbs] r tmp
+) -> reg ptr u64[nlimbs] {
+  inline int k;
+  reg bool cf;
+  reg u64 t t0 t1 zero u0r p0;
+  reg u64[3] x;
+
+  _, _, _, _, _, zero = #set0();
+  u0r = glob_u0;
+  p0 = glob_p[0];
+
+  _, _, _, _, _, x[0] = #set0();
+  _, _, _, _, _, x[1] = #set0();
+  _, _, _, _, _, x[2] = #set0();
+
+  for k = 0 to nlimbs {
+    x = _muln_innerloop_(k, 0, k, r, glob_p, x);
+    t0 = a[k];
+    x = _addacc3_(zero, t0, x, k);
+    t0 = x[k % 3];
+    _, t0 = t0 * u0r;
+    r[k] = t0;
+    t1, t0 = t0 * p0;
+    x = _addacc3_(t1, t0, x, k);
+  }
+  for k = nlimbs to 2*nlimbs-1 {
+    x = _muln_innerloop_(k, k-nlimbs+1, nlimbs, r, glob_p, x);
+    t0 = a[k];
+    x = _addacc3_(zero, t0, x, k);
+    t0 = x[k % 3];
+    r[k-nlimbs] = t0;
+    _, _, _, _, _, x[k % 3] = #set0();
+  }
+  x[(2*nlimbs-1) % 3] += a[2*nlimbs-1];
+  r[nlimbs-1] = x[(2*nlimbs-1) % 3];
+
+  r = _bn_cminusP_(r, tmp);
+  return r;
+}
+
+fn _bn_mulm
+( reg ptr u64[nlimbs] a b r
+) -> reg ptr u64[nlimbs] {
+  stack u64[nlimbs] tmp;
+  stack u64[2*nlimbs] tmp2;
+  tmp2 = _bn_muln_(a, b, tmp2);
+  r = _bn_rdcn_(tmp2, r, tmp);
+  return r;
+}
+
+fn _bn_mulmU // update inplace
+( reg ptr u64[nlimbs] a b
+) -> reg ptr u64[nlimbs] {
+  stack u64[nlimbs] tmp;
+  stack u64[2*nlimbs] tmp2;
+  tmp2 = _bn_muln_(a, b, tmp2);
+  a = _bn_rdcn_(tmp2, a, tmp);
+  return a;
+}
+
+fn _bn_sqrm
+( reg ptr u64[nlimbs] a r
+) -> reg ptr u64[nlimbs] {
+  stack u64[nlimbs] tmp;
+  stack u64[2*nlimbs] tmp2;
+  tmp2 = _bn_sqrn_(a, tmp2);
+  r = _bn_rdcn_(tmp2, r, tmp);
+  return r;
+}
+
+//STACK_RETURN_ADDRESS() 
+fn _bn_sqrmU // update inplace
+( reg ptr u64[nlimbs] a
+) -> reg ptr u64[nlimbs] {
+  stack u64[nlimbs] tmp;
+  stack u64[2*nlimbs] tmp2;
+  tmp2 = _bn_sqrn_(a, tmp2);
+  a = _bn_rdcn_(tmp2, a, tmp);
+  return a;
+}
+
+/* Modular exponentiation
+  obs: naive square-multiply algorithm. Not Constant-Time!!!
+  (good enough for use with public exponents, such as in inversion) */
+STACK_RETURN_ADDRESS() 
+fn _bn_expm
+( reg ptr u64[nlimbs] a b r 
+) -> reg ptr u64[nlimbs] {
+  inline int j;
+  reg u64 k t;
+  reg bool cf;
+  stack u64[nlimbs] x y;
+stack u64 ss;
+stack ptr u64[nlimbs] rr bb;
+
+  x = _bn_copy2_(a, x);
+  r = _bn_copy2_(glob_oneM, r);
+
+bb = b;
+rr = r;
+  for j = 0 to nlimbs {
+b = bb;
+    t = b[(int) j];
+    k = 64;
+    while (k != 0) {
+ss = k;
+      _, cf, _, _, _, t = #SHR(t, 1);
+      if (cf) {
+r = rr;
+	r = _bn_mulmU(r, x);
+rr = r;
+      }
+      x = _bn_sqrmU(x);
+k = ss;
+      k -= 1;
+    }
+  }
+r=rr;
+  return r;
+}
+
+/* Modular Inversion */
+inline fn _bn_invm_( reg ptr u64[nlimbs] a r ) -> reg ptr u64[nlimbs] {
+  /* a^{p-2} */
+  r = _bn_expm(a, glob_pm2, r);
+    
+  return r;
+}
+
+/* Conversion out from Montgomery form */
+fn _bn_fromM( reg ptr u64[nlimbs] a ) -> reg ptr u64[nlimbs] {
+  stack u64[nlimbs] tmp;
+  stack u64[2*nlimbs] tmp2;
+  reg u64 t;
+  inline int i;
+  for i = 0 to nlimbs {
+    tmp2[nlimbs + i] = 0;
+  }
+  for i = 0 to nlimbs {
+    t = a[i];
+    tmp2[i] = t;
+  }
+  a = _bn_rdcn_(tmp2, a, tmp);
+  return a;
+}
+
+/* Conversion into Montgomery form */
+fn _bn_toM( reg ptr u64[nlimbs] a ) -> reg ptr u64[nlimbs] {
+  a = _bn_mulmU(a, glob_rM);
+  return a;
+}
+
+
+
+#ifdef BN_GENERIC_MODULAR_EXPORT
+
+export fn bn_addm( reg u64 rp ap bp) {
+ stack u64[nlimbs] a, b, tmp;
+ reg ptr u64[nlimbs] r;
+ a = _bn_load_(ap);
+ b = _bn_load_(bp);
+ r = _bn_addm_(a, b, tmp);
+ _bn_store_(rp, r);
+}
+
+export fn bn_subm( reg u64 rp ap bp) {
+ stack u64[nlimbs] a, b, tmp;
+ reg ptr u64[nlimbs] r;
+ a = _bn_load_(ap);
+ b = _bn_load_(bp);
+ r = _bn_subm_(a, b, tmp);
+ _bn_store_(rp, r);
+}
+
+export fn bn_mulm(reg u64 rp ap bp) {
+  reg u64 rp_; 
+  stack u64[nlimbs] a b r;
+  a = _bn_load_(ap);
+  b = _bn_load_(bp);
+  rp_ = rp; // relax ABI constraint
+  r = _bn_mulm(a, b, r);
+  _bn_store_(rp_, r);
+}
+
+export fn bn_sqrm(reg u64 rp ap) {
+  reg u64 rp_; 
+  stack u64[nlimbs] a r;
+  a = _bn_load_(ap);
+  rp_ = rp; // relax ABI constraint
+  r = _bn_sqrm(a, r);
+  _bn_store_(rp_, r);
+}
+
+export fn bn_expm_noct(reg u64 rp ap bp) {
+  stack u64 rp_; 
+  stack u64[nlimbs] a b r;
+  a = _bn_load_(ap);
+  b = _bn_load_(bp);
+  rp_ = rp; // spill
+  r = _bn_expm(a, b, r);
+  rp = rp_;
+  _bn_store_(rp, r);
+}
+
+export fn bn_invm(reg u64 rp ap) {
+  stack u64 rp_; 
+  stack u64[nlimbs] a r;
+  a = _bn_load_(ap);
+  rp_ = rp; // relax ABI constraint
+  r = _bn_invm_(a, r);
+  rp = rp_;
+  _bn_store_(rp, r);
+}
+
+export fn bn_toM(reg u64 rp ap) {
+  reg u64 rp_; 
+  stack u64[nlimbs] a;
+  a = _bn_load_(ap);
+  rp_ = rp; // relax ABI constraint
+  a = _bn_toM(a);
+  _bn_store_(rp_, a);
+}
+
+export fn bn_fromM(reg u64 rp ap) {
+  reg u64 rp_; 
+  stack u64[nlimbs] a;
+  a = _bn_load_(ap);
+  rp_ = rp; // relax ABI constraint
+  a = _bn_fromM(a);
+  _bn_store_(rp_, a);
+}
+
+
+#endif
+// end: BN_GENERIC_MODULAR_EXPORT
+
+#ifdef BN_GENERIC_MODULAR_TOEC
+
+inline fn toEC() {
+  
+}
+
+#endif
+// end: BN_GENERIC_MODULAR_TOEC
+
+#endif
+// end: JASMIN_BN_GENERIC_MODULAR
