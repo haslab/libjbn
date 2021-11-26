@@ -1,18 +1,10 @@
 /*
-   SPECIFIC SIKE_P751 CODE
+   SPECIFIC SIKE-P751 CODE
 */
 
-#ifndef JASMIN_BN_SIKE751
-#define JASMIN_BN_SIKE751
+param int NLIMBS = 12;
 
-// Number of limbs and storage class
-#define NLIMBS 12
-param int nlimbs = NLIMBS;
-
-#ifdef BN_SIKE751_EXPORT
-#define BN_GENERIC_EXPORT
-#define BN_GENERIC_MODULAR_EXPORT
-#endif
+require "bn_generic.jinc"
 
 /* prime SIKE-P751 (P) */
 u64[NLIMBS] glob_p = { 0xffffffffffffffff,
@@ -88,7 +80,11 @@ u64[NLIMBS] glob_rM = { 0x233046449dad4058
 		      , 0x000041ad830f1f35 };
 
 
-#include "bn_generic_modular.jazz"
+require "bn_generic_modular.jinc"
 
-#endif
-//endif: JASMIN_BN_SIKE751
+
+
+// for test purposes... (exported functions)
+require "bn_generic.jazz"
+require "bn_generic_modular.jazz"
+

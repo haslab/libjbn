@@ -1,21 +1,10 @@
 /*
-   SPECIFIC P25519 CODE
+   SPECIFIC SIKE-P434 CODE
 */
 
-#ifndef JASMIN_BN_SIKE434
-#define JASMIN_BN_SIKE434
+param int NLIMBS = 7;
 
-#ifndef NLIMBS
-#define NLIMBS 7
-param int nlimbs = NLIMBS;
-#endif
-
-#ifdef BN_SIKE434_EXPORT
-#define BN_GENERIC_EXPORT
-#define BN_GENERIC_MODULAR_EXPORT
-#endif
-
-#include "bn_generic.jazz"
+require "bn_generic.jinc"
 
 /* prime SIKE-P434 (P) */
 u64[NLIMBS] glob_p = { 0xffffffffffffffff,
@@ -66,8 +55,10 @@ u64[NLIMBS] glob_rM = { 0x28e55b65dcd69b30,
 			0x69e16a61c7686d9a,
 			0x000025a89bcdd12a };
 
-#include "bn_generic_modular.jazz"
+require "bn_generic_modular.jinc"
 
 
-#endif
-//end: JASMIN_BN_SIKE434
+// for test purposes... (exported functions)
+require "bn_generic.jazz"
+require "bn_generic_modular.jazz"
+

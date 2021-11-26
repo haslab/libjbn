@@ -1,21 +1,10 @@
 /*
-   SPECIFIC P25519 CODE
+   SPECIFIC SIKE-P503 CODE
 */
 
-#ifndef JASMIN_BN_SIKE503
-#define JASMIN_BN_SIKE503
+param int NLIMBS = 8;
 
-#ifndef NLIMBS
-#define NLIMBS 8
-param int nlimbs = NLIMBS;
-#endif
-
-#ifdef BN_SIKE503_EXPORT
-#define BN_GENERIC_EXPORT
-#define BN_GENERIC_MODULAR_EXPORT
-#endif
-
-#include "bn_generic.jazz"
+require "bn_generic.jinc"
 
 /* prime SIKE-P503 (P) */
 u64[NLIMBS] glob_p = { 0xffffffffffffffff,
@@ -70,8 +59,10 @@ u64[NLIMBS] glob_rM = { 0x5289a0cf641d011f,
 			0x46e9127bce14cdb6,
 			0x003f6cfce8b81771 };
 
-#include "bn_generic_modular.jazz"
+require "bn_generic_modular.jinc"
 
 
-#endif
-//end: JASMIN_BN_SIKE503
+// for test purposes... (exported functions)
+require "bn_generic.jazz"
+require "bn_generic_modular.jazz"
+

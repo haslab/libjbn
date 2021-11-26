@@ -1,9 +1,19 @@
-include ../Makefile.common
+#include ../Makefile.common
+GFLAGS ?=
+JFLAGS ?=
+JASMINC ?= jasminc
 
 .DEFAULT_GOAL := all
 
 EC_TARGETS ?= bn_sike751.ec
 ASM_TARGETS ?= bn_sike751.s
+
+%.s: %.jazz
+	@$(JASMINC) $(JFLAGS) -o $@ $< || (rm -f $@ && touch fail && echo "\033[1;31m FAIL \033[0m")
+
+%.ec: %.jazz
+	@$(JASMINC) $(JFLAGS) -ec toEC -oec $@ $< || (rm -f $@ && touch fail && echo "\033[1;31m FAIL \033[0m")
+
 
 all: test751 test610 test503 test434
 
@@ -22,21 +32,6 @@ test434: test_bn_sike434.c bn_sike434.s
 sfiles: asm-clean $(ASM_TARGETS)
 
 ecfiles: $(EC_TARGETS)
-
-bn_generic.s : GFLAGS += -D BN_GENERIC_EXPORT
-bn_generic.ec : GFLAGS += -D BN_GENERIC_TOEC
-
-bn_sike751.s : GFLAGS += -D BN_SIKE751_EXPORT
-bn_sike751.ec : GFLAGS += -D BN_SIKE751_TOEC
-
-bn_sike610.s : GFLAGS += -D BN_SIKE610_EXPORT
-bn_sike610.ec : GFLAGS += -D BN_SIKE610_TOEC
-
-bn_sike503.s : GFLAGS += -D BN_SIKE503_EXPORT
-bn_sike503.ec : GFLAGS += -D BN_SIKE503_TOEC
-
-bn_sike434.s : GFLAGS += -D BN_SIKE434_EXPORT
-bn_sike434.ec : GFLAGS += -D BN_SIKE434_TOEC
 
 asm-clean:
 	@rm -f fail *.japp $(ASM_TARGETS)

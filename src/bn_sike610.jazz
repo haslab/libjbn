@@ -1,21 +1,10 @@
 /*
-   SPECIFIC SIKE_P610 CODE
+   SPECIFIC SIKE-P610 CODE
 */
 
-#ifndef JASMIN_BN_SIKE610
-#define JASMIN_BN_SIKE610
+param int NLIMBS = 10;
 
-#ifndef NLIMBS
-#define NLIMBS 10
-param int nlimbs = NLIMBS;
-#endif
-
-#ifdef BN_SIKE610_EXPORT
-#define BN_GENERIC_EXPORT
-#define BN_GENERIC_MODULAR_EXPORT
-#endif
-
-#include "bn_generic.jazz"
+require "bn_generic.jinc"
 
 /* prime SIKE-P610 (P) */
 u64[NLIMBS] glob_p = { 0xffffffffffffffff,
@@ -81,8 +70,10 @@ u64[NLIMBS] glob_rM = { 0xe75f5d201a197727,
 			0x7019950f516da19a,
 			0x000000008e290ff3 };
 
-#include "bn_generic_modular.jazz"
+require "bn_generic_modular.jinc"
 
 
-#endif
-//end: JASMIN_BN_SIKE610
+// for test purposes... (exported functions)
+require "bn_generic.jazz"
+require "bn_generic_modular.jazz"
+
